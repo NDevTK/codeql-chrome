@@ -2,6 +2,8 @@
 
 Runtime JavaScript security analysis. Launches Chrome with CDP, captures every script as it executes, and runs CodeQL to find vulnerabilities with full dataflow traces.
 
+![Screenshot](Screenshot.png)
+
 Unlike static scanners that analyze source files on disk, this tool captures JavaScript **as the browser sees it** — including dynamically fetched scripts, inline scripts, `eval`'d code, and scripts injected at runtime. Each execution context (page, iframe) gets its own CodeQL database so cross-file analysis is accurate and findings don't cross-contaminate between unrelated pages.
 
 ## Quick Start
