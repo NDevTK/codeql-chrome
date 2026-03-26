@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import socket
 import subprocess
 import tempfile
 import time
@@ -9,16 +10,20 @@ import urllib.request
 from app.config import CDP_PORT, find_chrome
 
 
+def _port_in_use(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(("127.0.0.1", port)) == 0
+
+
 class ChromeLauncher:
-    def __init__(self, chrome_path: str | None = None, cdp_port: int = CDP_PORT,
-                 headless: bool = False):
+    def __init__(self, chrome_path: str | None = None, cdp_port: int = CDP_PORT):
         self._chrome_path = chrome_path or find_chrome()
         if not (1024 <= cdp_port <= 65535):
             raise ValueError(f"CDP port must be 1024-65535, got {cdp_port}")
         self._cdp_port = cdp_port
-        self._headless = headless
         self._process: subprocess.Popen | None = None
         self._temp_profile_dir: str | None = None
+        self._owns_process = False  # True if we launched Chrome
 
     @property
     def cdp_port(self) -> int:
@@ -30,13 +35,24 @@ class ChromeLauncher:
 
     @property
     def is_running(self) -> bool:
-        return self._process is not None and self._process.poll() is None
+        if self._process is not None:
+            return self._process.poll() is None
+        return _port_in_use(self._cdp_port)
 
     def launch(self, url: str = "about:blank", timeout: float = 10.0) -> str:
+        """Launch Chrome or connect to an existing instance on the CDP port."""
+        if _port_in_use(self._cdp_port):
+            # Reuse existing Chrome
+            self._owns_process = False
+            return self._wait_for_cdp(timeout)
+
         if not self._chrome_path:
             raise FileNotFoundError("Chrome executable not found")
 
-        self._temp_profile_dir = tempfile.mkdtemp(prefix="codeql_chrome_")
+        # Persistent profile so cookies/logins survive across sessions
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self._temp_profile_dir = os.path.join(project_root, "chrome-profile")
+        os.makedirs(self._temp_profile_dir, exist_ok=True)
 
         cmd = [
             self._chrome_path,
@@ -44,11 +60,8 @@ class ChromeLauncher:
             f"--user-data-dir={self._temp_profile_dir}",
             "--no-first-run",
             "--no-default-browser-check",
+            url,
         ]
-        if self._headless:
-            cmd.append("--headless=new")
-            cmd.append("--disable-gpu")
-        cmd.append(url)
 
         creation_flags = 0
         if os.name == "nt":
@@ -60,6 +73,7 @@ class ChromeLauncher:
             stderr=subprocess.DEVNULL,
             creationflags=creation_flags,
         )
+        self._owns_process = True
 
         ws_url = self._wait_for_cdp(timeout)
         return ws_url
@@ -87,7 +101,7 @@ class ChromeLauncher:
             return []
 
     def shutdown(self):
-        if self._process:
+        if self._process and self._owns_process:
             try:
                 self._process.terminate()
                 self._process.wait(timeout=5)
@@ -97,10 +111,4 @@ class ChromeLauncher:
                 except Exception:
                     pass
             self._process = None
-
-        if self._temp_profile_dir and os.path.isdir(self._temp_profile_dir):
-            try:
-                shutil.rmtree(self._temp_profile_dir, ignore_errors=True)
-            except Exception:
-                pass
-            self._temp_profile_dir = None
+        # Profile is persistent — don't delete it

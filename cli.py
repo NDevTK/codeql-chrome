@@ -56,8 +56,6 @@ def parse_args():
                    help="Write merged SARIF output to this file")
     p.add_argument("--json", dest="json_output", action="store_true",
                    help="Print findings as JSON to stdout")
-    p.add_argument("--no-headless", action="store_true",
-                   help="Run Chrome with a visible window (default: headless)")
     p.add_argument("--no-cleanup", action="store_true",
                    help="Skip startup cleanup of stale temp dirs")
     p.add_argument("--clear", action="store_true",
@@ -168,17 +166,14 @@ def main():
         store.clear()
         log("Cleared persisted findings")
 
-    headless = not args.no_headless
     log(f"Chrome: {chrome_path}")
     log(f"CodeQL: {codeql_path}")
-    log(f"Mode: {'headless' if headless else 'visible'}")
     if args.spider:
         log(f"Spider: depth={args.depth}, max_pages={args.max_pages}, scope={args.scope}")
 
     launcher = ChromeLauncher(
         chrome_path=chrome_path,
         cdp_port=args.port,
-        headless=headless,
     )
 
     try:

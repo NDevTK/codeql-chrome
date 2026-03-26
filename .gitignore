@@ -5,6 +5,9 @@ codeql/
 findings.json
 sources/
 
+# Chrome profile (persistent across sessions)
+chrome-profile/
+
 # Python
 __pycache__/
 *.pyc
