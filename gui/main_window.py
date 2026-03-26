@@ -1,6 +1,6 @@
 import os
 
-from PySide6.QtCore import Qt, QSettings, QTimer
+from PySide6.QtCore import Qt, QFileSystemWatcher, QSettings, QTimer
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QDialog,
@@ -194,6 +194,35 @@ class MainWindow(QMainWindow):
         if self._store.count > 0:
             self._findings_panel.load_findings(self._store.findings)
             self._toolbar.set_status(self._store.summary_text(), "#3498db")
+        # Watch findings.json for external changes (CLI writes)
+        self._file_watcher = QFileSystemWatcher(self)
+        if os.path.isfile(self._store._path):
+            self._file_watcher.addPath(self._store._path)
+        self._file_watcher.fileChanged.connect(self._on_findings_file_changed)
+
+    def _on_findings_file_changed(self, path: str):
+        """findings.json was modified externally — reload."""
+        old_count = self._store.count
+        self._store._findings.clear()
+        self._store._seen.clear()
+        self._store._load()
+        self._findings_panel.load_findings(self._store.findings)
+        new_count = self._store.count
+        if new_count > old_count:
+            added = new_count - old_count
+            self._toolbar.set_status(self._store.summary_text(), "#e74c3c")
+            self._notify(
+                "CodeQL: New Findings",
+                f"{added} new finding{'s' if added != 1 else ''}. "
+                f"Total: {self._store.summary_text()}",
+            )
+        elif new_count > 0:
+            self._toolbar.set_status(self._store.summary_text(), "#3498db")
+        else:
+            self._toolbar.set_status("Findings cleared", "#27ae60")
+        # Re-add path to watcher (some OS remove it after change)
+        if os.path.isfile(path) and path not in self._file_watcher.files():
+            self._file_watcher.addPath(path)
 
     def _check_prerequisites(self):
         prereqs = verify_prerequisites()
@@ -446,8 +475,12 @@ class MainWindow(QMainWindow):
         self._daemon = CodeQLDaemon(
             store=self._store,
             codeql_path=codeql_path,
-            on_progress=lambda msg: QTimer.singleShot(0, lambda: self._on_progress(msg)),
-            on_findings=lambda ck, fl: QTimer.singleShot(0, lambda: self._on_daemon_findings(ck, fl)),
+            on_progress=lambda msg: QTimer.singleShot(
+                0, lambda m=msg: self._on_progress(m)
+            ),
+            on_findings=lambda ck, fl: QTimer.singleShot(
+                0, lambda c=ck, f=fl: self._on_daemon_findings(c, f)
+            ),
         )
         self._daemon.start()
 
