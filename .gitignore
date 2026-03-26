@@ -1,0 +1,34 @@
+# CodeQL CLI bundle (auto-downloaded)
+codeql/
+
+# Persisted findings and source files
+findings.json
+sources/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+*.spec
+
+# Qt
+*.qmlc
+*.jsc
+
+# Temp/working dirs
+*.tmp
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
