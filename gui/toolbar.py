@@ -4,8 +4,7 @@ from PySide6.QtWidgets import QLabel, QToolBar, QWidget
 
 
 class AnalysisToolbar(QToolBar):
-    spider_requested = Signal()
-    stop_spider_requested = Signal()
+    spider_toggled = Signal(bool)  # True = start, False = stop
     clear_findings_requested = Signal()
     settings_requested = Signal()
 
@@ -15,15 +14,10 @@ class AnalysisToolbar(QToolBar):
 
         self._spider_action = QAction("Spider", self)
         self._spider_action.setToolTip("Crawl links from the current page")
+        self._spider_action.setCheckable(True)
         self._spider_action.setEnabled(False)
-        self._spider_action.triggered.connect(self.spider_requested)
+        self._spider_action.toggled.connect(self.spider_toggled)
         self.addAction(self._spider_action)
-
-        self._stop_spider_action = QAction("Stop Spider", self)
-        self._stop_spider_action.setToolTip("Stop the spider crawl")
-        self._stop_spider_action.setEnabled(False)
-        self._stop_spider_action.triggered.connect(self.stop_spider_requested)
-        self.addAction(self._stop_spider_action)
 
         self.addSeparator()
 
@@ -52,12 +46,16 @@ class AnalysisToolbar(QToolBar):
 
     def set_state_starting(self):
         self._spider_action.setEnabled(False)
-        self._stop_spider_action.setEnabled(False)
 
     def set_state_ready(self):
         self._spider_action.setEnabled(True)
-        self._stop_spider_action.setEnabled(False)
+        # Uncheck without emitting the signal
+        self._spider_action.blockSignals(True)
+        self._spider_action.setChecked(False)
+        self._spider_action.blockSignals(False)
 
     def set_state_spidering(self):
-        self._spider_action.setEnabled(False)
-        self._stop_spider_action.setEnabled(True)
+        self._spider_action.setEnabled(True)
+        self._spider_action.blockSignals(True)
+        self._spider_action.setChecked(True)
+        self._spider_action.blockSignals(False)

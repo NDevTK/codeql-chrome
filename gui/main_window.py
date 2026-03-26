@@ -131,8 +131,7 @@ class MainWindow(QMainWindow):
         self._toolbar = AnalysisToolbar(self)
         self.addToolBar(self._toolbar)
 
-        self._toolbar.spider_requested.connect(self._on_spider)
-        self._toolbar.stop_spider_requested.connect(self._on_stop_spider)
+        self._toolbar.spider_toggled.connect(self._on_spider_toggled)
         self._toolbar.clear_findings_requested.connect(self._on_clear_findings)
         self._toolbar.settings_requested.connect(self._on_settings)
 
@@ -168,9 +167,17 @@ class MainWindow(QMainWindow):
 
     def _setup_tray(self):
         self._tray = QSystemTrayIcon(self)
-        self._tray.setIcon(self.style().standardIcon(
-            self.style().StandardPixmap.SP_MessageBoxWarning
-        ))
+        icon_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "icons", "icon.png",
+        )
+        if os.path.isfile(icon_path):
+            from PySide6.QtGui import QIcon
+            self._tray.setIcon(QIcon(icon_path))
+        else:
+            self._tray.setIcon(self.style().standardIcon(
+                self.style().StandardPixmap.SP_MessageBoxWarning
+            ))
         self._tray.setToolTip("CodeQL Chrome")
         if self._tray.isSystemTrayAvailable():
             self._tray.show()
@@ -328,15 +335,22 @@ class MainWindow(QMainWindow):
 
     # ── Spider ──
 
-    def _on_spider(self):
+    def _on_spider_toggled(self, checked: bool):
+        if checked:
+            self._start_spider()
+        else:
+            self._stop_spider()
+
+    def _start_spider(self):
         if not self._capture_worker:
+            self._toolbar.set_state_ready()
             return
         pc = self._capture_worker.get_page_client()
         if not pc:
-            QMessageBox.warning(self, "No Page", "No page target connected.")
+            QMessageBox.warning(self, "Spider", "No page target connected.")
+            self._toolbar.set_state_ready()
             return
 
-        # Get actual URL from the live page
         try:
             result = pc.evaluate("location.href")
             start_url = result.get("result", {}).get("value", "")
@@ -344,9 +358,10 @@ class MainWindow(QMainWindow):
             start_url = ""
         if not start_url or start_url in ("about:blank", "chrome://newtab/"):
             QMessageBox.warning(
-                self, "No URL",
+                self, "Spider",
                 "Navigate to a page first, then start the spider.",
             )
+            self._toolbar.set_state_ready()
             return
 
         config = SpiderConfig(
@@ -375,7 +390,7 @@ class MainWindow(QMainWindow):
             f"{result.url} — {result.links_found} links ({result.status})"
         )
 
-    def _on_stop_spider(self):
+    def _stop_spider(self):
         if self._spider_worker:
             self._spider_worker.stop()
             self._spider_worker.wait(5000)

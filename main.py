@@ -33,7 +33,7 @@ def _run_gui():
         print(f"Startup cleanup: removed {removed} stale temp dir(s)")
 
     from PySide6.QtWidgets import QApplication
-    from PySide6.QtGui import QPalette, QColor
+    from PySide6.QtGui import QIcon, QPalette, QColor
 
     app = QApplication(sys.argv)
     app.setApplicationName("CodeQL Chrome")
@@ -57,6 +57,10 @@ def _run_gui():
     palette.setColor(QPalette.Disabled, QPalette.Text, QColor(128, 128, 128))
     palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(128, 128, 128))
     app.setPalette(palette)
+
+    icon_path = os.path.join(os.path.dirname(__file__), "icons", "icon.png")
+    if os.path.isfile(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
 
     from gui.main_window import MainWindow
     window = MainWindow()
