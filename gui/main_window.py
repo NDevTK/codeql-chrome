@@ -120,8 +120,9 @@ class MainWindow(QMainWindow):
         self._codeql_ready = False
         self._setup_then_launch = False
 
-        self._debounce_timers: dict[str, QTimer] = {}
-        self._analyzed_hashes: dict[str, str] = {}
+        self._debounce_timers: dict[str, QTimer] = {}  # context_key → timer
+        self._analyzed_content: set[str] = set()  # content hashes already analyzed
+        self._last_notified_count = 0
 
         self._setup_ui()
         self._setup_tray()
@@ -201,6 +202,7 @@ class MainWindow(QMainWindow):
         if self._store.count > 0:
             self._findings_panel.load_findings(self._store.findings)
             self._toolbar.set_status(self._store.summary_text(), "#3498db")
+        self._last_notified_count = self._store.count
         # Watch findings.json for external changes (CLI writes)
         self._file_watcher = QFileSystemWatcher(self)
         if os.path.isfile(self._store._path):
@@ -445,9 +447,9 @@ class MainWindow(QMainWindow):
         if not scripts:
             return
         h = content_hash(scripts)
-        if self._analyzed_hashes.get(context_key) == h:
+        if h in self._analyzed_content:
             return
-        self._analyzed_hashes[context_key] = h
+        self._analyzed_content.add(h)
         ci = self._capture_worker.get_context_info(context_key)
         label = ci.label if ci else context_key
         self._ensure_daemon()
@@ -458,22 +460,27 @@ class MainWindow(QMainWindow):
             )
 
     def _on_daemon_findings(self, context_key: str, findings: list):
+        old_count = self._last_notified_count
         self._findings_panel.load_findings(self._store.findings)
-        if self._store.count > 0:
+        new_count = self._store.count
+        if new_count > 0:
             self._toolbar.set_status(self._store.summary_text(), "#e74c3c")
         else:
             self._toolbar.set_status("No findings", "#27ae60")
-        if findings:
+        added = new_count - old_count
+        if added > 0:
+            self._last_notified_count = new_count
             self._notify(
                 "CodeQL: Security Findings Detected",
-                f"{len(findings)} new. Total: {self._store.summary_text()}",
+                f"{added} new. Total: {self._store.summary_text()}",
             )
 
     # ── Clear ──
 
     def _on_clear_findings(self):
         self._store.clear()
-        self._analyzed_hashes.clear()
+        self._analyzed_content.clear()
+        self._last_notified_count = 0
         self._findings_panel.clear()
         self._trace_panel.clear()
         self._source_panel.clear()
