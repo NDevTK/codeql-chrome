@@ -1,7 +1,8 @@
 import os
+import webbrowser
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QStandardItem, QStandardItemModel
+from PySide6.QtGui import QBrush, QColor, QCursor, QFont, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QHeaderView,
     QLineEdit,
@@ -12,6 +13,22 @@ from PySide6.QtWidgets import (
 
 from app.config import SEVERITY_COLORS
 from app.sarif_parser import Finding
+
+
+class LinkItem(QStandardItem):
+    """A QStandardItem that looks and acts like a clickable link."""
+    def __init__(self, text: str, url: str = ""):
+        super().__init__(text)
+        self._url = url or text
+        font = self.font()
+        font.setUnderline(True)
+        self.setFont(font)
+        self.setForeground(QBrush(QColor("#569cd6")))
+        self.setToolTip(self._url)
+
+    @property
+    def url(self) -> str:
+        return self._url
 
 
 class FindingsPanel(QWidget):
@@ -51,12 +68,10 @@ class FindingsPanel(QWidget):
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # Severity
         header.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # Rule
         header.setSectionResizeMode(2, QHeaderView.Stretch)           # Message
-        header.setSectionResizeMode(3, QHeaderView.Interactive)       # Script URL
-        header.setSectionResizeMode(4, QHeaderView.Interactive)       # Page Context
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)  # Script URL
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # Page Context
         header.setSectionResizeMode(5, QHeaderView.ResizeToContents)  # File
         header.setSectionResizeMode(6, QHeaderView.ResizeToContents)  # Line
-        header.resizeSection(3, 220)
-        header.resizeSection(4, 220)
 
         layout.addWidget(self._tree)
 
@@ -73,11 +88,8 @@ class FindingsPanel(QWidget):
             rule_item = QStandardItem(finding.rule_id)
             msg_item = QStandardItem(finding.message)
 
-            url_item = QStandardItem(finding.script_url)
-            url_item.setToolTip(finding.script_url)
-
-            ctx_item = QStandardItem(finding.page_context)
-            ctx_item.setToolTip(finding.page_context)
+            url_item = LinkItem(finding.script_url, finding.script_url)
+            ctx_item = LinkItem(finding.page_context, finding.page_context)
 
             file_item = QStandardItem(os.path.basename(finding.file_path))
             file_item.setToolTip(finding.file_path)
@@ -92,8 +104,11 @@ class FindingsPanel(QWidget):
                 ctx_item, file_item, line_item,
             ])
 
+        # Resize all columns to fit after loading
+        for col in range(self._model.columnCount()):
+            self._tree.resizeColumnToContents(col)
+
     def remove_by_context(self, context_key: str):
-        """Remove findings belonging to a destroyed context."""
         rows_to_remove = []
         for row in range(self._model.rowCount()):
             item = self._model.item(row, 0)
@@ -102,7 +117,6 @@ class FindingsPanel(QWidget):
             finding = item.data(Qt.UserRole)
             if finding and finding.context_key == context_key:
                 rows_to_remove.append(row)
-        # Remove from bottom up so indices stay valid
         for row in reversed(rows_to_remove):
             self._model.removeRow(row)
         self._findings = [
@@ -111,9 +125,18 @@ class FindingsPanel(QWidget):
 
     def _on_clicked(self, index):
         row = index.row()
-        item = self._model.item(row, 0)
-        if item:
-            finding = item.data(Qt.UserRole)
+        col = index.column()
+
+        # If clicking a link column, open in browser
+        item = self._model.item(row, col)
+        if isinstance(item, LinkItem) and item.url.startswith("http"):
+            webbrowser.open(item.url)
+            return
+
+        # Otherwise select the finding
+        sev_item = self._model.item(row, 0)
+        if sev_item:
+            finding = sev_item.data(Qt.UserRole)
             if finding:
                 self.finding_selected.emit(finding)
 
