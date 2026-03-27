@@ -2,9 +2,7 @@ import os
 import subprocess
 import tempfile
 
-import glob
-
-from app.config import CLIENT_SIDE_QUERIES, find_codeql
+from app.config import CODEQL_QUERY_SUITE, find_codeql
 
 
 def _get_system_ram_mb() -> int:
@@ -89,22 +87,7 @@ class CodeQLRunner:
         return self._run(cmd, on_output)
 
     def _resolve_queries(self) -> list[str]:
-        """Find absolute paths for the client-side query files."""
-        codeql_dir = os.path.dirname(self._codeql)
-        # Search for the javascript-queries pack
-        pack_pattern = os.path.join(
-            codeql_dir, "qlpacks", "codeql", "javascript-queries", "*"
-        )
-        pack_dirs = sorted(glob.glob(pack_pattern), reverse=True)
-        if not pack_dirs:
-            return []
-        pack_dir = pack_dirs[0]
-        resolved = []
-        for q in CLIENT_SIDE_QUERIES:
-            full = os.path.join(pack_dir, q)
-            if os.path.isfile(full):
-                resolved.append(full)
-        return resolved
+        return [CODEQL_QUERY_SUITE]
 
     def run_analysis(self, query_suite: str | None = None,
                      on_output: callable = None) -> subprocess.CompletedProcess:

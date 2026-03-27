@@ -4,7 +4,6 @@ Runs a thread pool of workers. Each worker creates its own CodeQL database
 scoped to one execution context, so findings never cross-contaminate.
 CPU threads and RAM are divided across workers to avoid over-subscription.
 """
-import glob
 import os
 import subprocess
 import shutil
@@ -15,7 +14,7 @@ from queue import Queue, Empty
 from typing import Callable
 
 from app.cdp_client import ScriptInfo
-from app.config import CLIENT_SIDE_QUERIES, find_codeql
+from app.config import CODEQL_QUERY_SUITE, find_codeql
 from app.findings_store import FindingsStore
 from app.sarif_parser import Finding, SarifParser
 from app.script_store import ScriptStore
@@ -260,20 +259,7 @@ class CodeQLDaemon:
         return proc.returncode
 
     def _resolve_queries(self) -> list[str]:
-        codeql_dir = os.path.dirname(self._codeql)
-        pack_pattern = os.path.join(
-            codeql_dir, "qlpacks", "codeql", "javascript-queries", "*"
-        )
-        pack_dirs = sorted(glob.glob(pack_pattern), reverse=True)
-        if not pack_dirs:
-            return ["javascript-security-extended.qls"]
-        pack_dir = pack_dirs[0]
-        resolved = []
-        for q in CLIENT_SIDE_QUERIES:
-            full = os.path.join(pack_dir, q)
-            if os.path.isfile(full):
-                resolved.append(full)
-        return resolved or ["javascript-security-extended.qls"]
+        return [CODEQL_QUERY_SUITE]
 
     def _emit_progress(self, msg: str):
         if self._on_progress:

@@ -29,7 +29,7 @@ CodeQL is downloaded automatically on first run (~620MB).
 2. **CDP captures all JavaScript** via `Debugger.scriptParsed` — external files, inline scripts, `eval`'d code, dynamically imported modules
 3. **Execution contexts are tracked** via `Runtime.executionContextCreated` — each page and each cross-origin iframe is isolated
 4. **Debounce** fires 3 seconds after the last script arrives in a context
-5. **CodeQL daemon** (5 parallel workers) creates a database per context, runs 24 client-side security queries
+5. **CodeQL daemon** (parallel workers) creates a database per context, runs the full `javascript-security-extended` query suite
 6. **Findings with full traces** are persisted to `findings.json`, source files to `sources/`
 7. **System notification** fires when new findings are detected
 
@@ -80,7 +80,7 @@ python main.py
 
 On startup the GUI automatically launches Chrome (or connects to an existing instance on port 9222), starts capturing scripts, and loads any persisted findings from previous sessions.
 
-**Toolbar:** Spider | Stop Spider | Clear Findings | Settings
+**Toolbar:** Spider | Clear Findings | Settings
 
 **Panels:**
 - **Findings** (left) — sortable, filterable table: severity, rule, message, script URL, page context, file, line
@@ -115,13 +115,13 @@ The isolation key is Chrome's `context.uniqueId` from `Runtime.executionContextC
 
 | Detail | Value |
 |--------|-------|
-| Queries | 24 client-side only (no Node.js server-side rules) |
-| Workers | 5 parallel (auto-scaled to CPU cores) |
-| Per worker | 4 threads, ~5GB RAM (on 20-core/32GB) |
+| Query suite | `javascript-security-extended.qls` — full suite, no exclusions |
+| Workers | Parallel (auto-scaled to CPU cores) |
+| Per worker | Threads and RAM divided evenly across workers |
 | Cache | Compiled queries reused across all databases |
 | Sources | Full JS files persisted by content hash when findings exist |
 
-Queries cover: DOM XSS, code injection (`eval`), client-side URL redirect, client-side request forgery, `postMessage` issues, prototype pollution, insecure randomness, incomplete sanitization, untrusted script sources.
+The full suite covers XSS, code injection, open redirects, request forgery, postMessage issues, prototype pollution, insecure crypto, SQL injection, command injection, path traversal, cookie issues, hardcoded credentials, and more. Queries that don't match browser code produce zero results with negligible overhead.
 
 ## Spider
 
@@ -139,19 +139,19 @@ app/
   cdp_client.py          CDP WebSocket client (context tracking, auto-attach iframes)
   chrome_launcher.py     Chrome lifecycle (launch or reuse existing, persistent profile)
   spider.py              BFS crawler via live DOM
-  codeql_daemon.py       Parallel analysis (5-worker thread pool)
+  codeql_daemon.py       Parallel analysis daemon (thread pool)
   codeql_runner.py       CodeQL subprocess wrapper
   codeql_setup.py        Auto-downloads CodeQL bundle
-  config.py              24 client-side queries, path detection
+  config.py              Query suite config, path detection
   findings_store.py      Persistent findings (JSON, dedup, SARIF/JSON export)
   sarif_parser.py        SARIF v2.1.0 parser
-  script_store.py        Saves captured JS, reverse lookup
+  script_store.py        Saves captured JS to disk, reverse lookup
   workers.py             Qt thread workers (capture, spider, setup)
   cleanup.py             Startup cleanup of stale temp dirs
 
 gui/
   main_window.py         Main window, auto-analysis, context lifecycle
-  toolbar.py             Spider / Stop / Clear / Settings
+  toolbar.py             Spider / Clear / Settings
   findings_panel.py      Findings table
   trace_panel.py         Dataflow trace tree
   source_panel.py        Code editor with JS highlighting

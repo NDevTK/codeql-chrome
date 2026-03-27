@@ -8,45 +8,7 @@ CHROME_PATHS = [
 
 CDP_PORT = 9222
 
-# Client-side-only queries — no server-side Node.js rules.
-# 24 queries vs 104 in javascript-security-extended.qls.
-CLIENT_SIDE_QUERIES = [
-    # DOM XSS
-    "Security/CWE-079/Xss.ql",
-    "Security/CWE-079/XssThroughDom.ql",
-    "Security/CWE-079/UnsafeJQueryPlugin.ql",
-    "Security/CWE-079/UnsafeHtmlConstruction.ql",
-    "Security/CWE-079/ReflectedXss.ql",
-    "Security/CWE-079/StoredXss.ql",
-    # Code injection (eval, Function, setTimeout string)
-    "Security/CWE-094/CodeInjection.ql",
-    "Security/CWE-094/UnsafeCodeConstruction.ql",
-    "Security/CWE-094/UnsafeDynamicMethodAccess.ql",
-    # Client-side URL redirect
-    "Security/CWE-601/ClientSideUrlRedirect.ql",
-    # Client-side request forgery
-    "Security/CWE-918/ClientSideRequestForgery.ql",
-    # postMessage
-    "Security/CWE-020/MissingOriginCheck.ql",
-    "Security/CWE-201/PostMessageStar.ql",
-    # Sanitization issues
-    "Security/CWE-116/BadTagFilter.ql",
-    "Security/CWE-116/IncompleteHtmlAttributeSanitization.ql",
-    "Security/CWE-116/IncompleteSanitization.ql",
-    # Tainted conditions
-    "Security/CWE-807/ConditionalBypass.ql",
-    "Security/CWE-843/TypeConfusionThroughParameterTampering.ql",
-    # Untrusted script sources
-    "Security/CWE-830/FunctionalityFromUntrustedDomain.ql",
-    "Security/CWE-830/FunctionalityFromUntrustedSource.ql",
-    # Client-side crypto
-    "Security/CWE-338/InsecureRandomness.ql",
-    # Prototype pollution
-    "Security/CWE-915/PrototypePollutingAssignment.ql",
-    "Security/CWE-915/PrototypePollutingMergeCall.ql",
-    # Cookie exposure
-    "Security/CWE-1004/ClientExposedCookie.ql",
-]
+CODEQL_QUERY_SUITE = "javascript-security-extended.qls"
 
 SEVERITY_MAP = {
     "error": "High",
