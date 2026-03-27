@@ -26,6 +26,13 @@ def main():
 
 
 def _run_gui():
+    # Set AppUserModelID so Windows taskbar shows our icon, not Python's
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("CodeQLChrome.1")
+    except Exception:
+        pass
+
     from app.cleanup import cleanup_stale_temp_dirs
 
     removed = cleanup_stale_temp_dirs()

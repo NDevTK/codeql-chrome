@@ -1,6 +1,6 @@
 import os
 
-from PySide6.QtCore import Qt, QFileSystemWatcher, QSettings, QTimer
+from PySide6.QtCore import Qt, QFileSystemWatcher, QSettings, QTimer, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QDialog,
@@ -101,6 +101,10 @@ class SettingsDialog(QDialog):
 
 
 class MainWindow(QMainWindow):
+    # Signals for thread-safe daemon callbacks
+    _daemon_progress = Signal(str)
+    _daemon_findings_signal = Signal(str, list)
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("CodeQL Chrome — JavaScript Security Analyzer")
@@ -122,6 +126,10 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._setup_tray()
         self._load_persisted_findings()
+
+        # Connect daemon signals (thread-safe cross-thread communication)
+        self._daemon_progress.connect(self._on_progress)
+        self._daemon_findings_signal.connect(self._on_daemon_findings)
 
         QTimer.singleShot(100, self._auto_start)
 
@@ -414,12 +422,8 @@ class MainWindow(QMainWindow):
         self._daemon = CodeQLDaemon(
             store=self._store,
             codeql_path=codeql_path,
-            on_progress=lambda msg: QTimer.singleShot(
-                0, lambda m=msg: self._on_progress(m)
-            ),
-            on_findings=lambda ck, fl: QTimer.singleShot(
-                0, lambda c=ck, f=fl: self._on_daemon_findings(c, f)
-            ),
+            on_progress=lambda msg: self._daemon_progress.emit(msg),
+            on_findings=lambda ck, fl: self._daemon_findings_signal.emit(ck, fl),
         )
         self._daemon.start()
 
